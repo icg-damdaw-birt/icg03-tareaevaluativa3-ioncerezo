@@ -103,3 +103,70 @@ exports.deleteMovie = async (req, res) => {
     res.status(500).json({ error: 'No se pudo eliminar la película' });
   }
 };
+
+// PATCH /api/movies/:id/favorite - Alternar favorito
+exports.toggleFavorite = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Verificar que la película existe y pertenece al usuario
+    const movie = await prisma.movie.findFirst({
+      where: { id, ownerId: req.user.userId },
+    });
+
+    if (!movie) {
+      return res.status(404).json({ error: 'Película no encontrada' });
+    }
+
+    // Alternar el valor de isFavorite (true ↔ false)
+    const updatedMovie = await prisma.movie.update({
+      where: { id },
+      data: { isFavorite: !movie.isFavorite },
+    });
+
+    res.json(updatedMovie);
+  } catch (error) {
+    res.status(500).json({ error: 'Error al actualizar favorito' });
+  }
+};
+
+// PATCH /api/movies/:id/rating - Actualizar la nota de la película
+exports.updateRating = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating } = req.body;
+    
+    // Usamos req.user.userId para mantener la coherencia con el resto de tu código
+    const currentUserId = req.user.userId; 
+
+    // 1. VALIDACIÓN: Comprobamos que el rating es un número y está entre 0 y 5
+    if (typeof rating !== 'number' || rating < 0 || rating > 5) {
+      return res.status(400).json({ message: "El rating debe ser un número entero entre 0 y 5." });
+    }
+
+    // 2. VERIFICACIÓN DE PROPIEDAD: Usamos ownerId como en el resto de tus rutas
+    const movie = await prisma.movie.findFirst({
+      where: { 
+        id: id, 
+        ownerId: currentUserId 
+      }
+    });
+
+    if (!movie) {
+      return res.status(404).json({ message: "Película no encontrada o no autorizada." });
+    }
+
+    // 3. ACTUALIZACIÓN: Guardamos la nueva nota
+    const updatedMovie = await prisma.movie.update({
+      where: { id: id },
+      data: { rating: rating }
+    });
+
+    // 4. RESPUESTA: Devolvemos un status 200 y la película actualizada
+    res.status(200).json(updatedMovie);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
